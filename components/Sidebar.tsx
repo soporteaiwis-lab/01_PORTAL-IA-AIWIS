@@ -10,26 +10,31 @@ export const Sidebar = ({
   currentRoute, 
   onNavigate, 
   onLogout,
-  onOpenTools
+  onOpenTools,
+  companyName // Recibimos el nombre dinámico
 }: { 
   currentUser: User, 
   currentRoute: AppRoute, 
   onNavigate: (r: AppRoute) => void,
   onLogout: () => void,
-  onOpenTools: () => void
+  onOpenTools: () => void,
+  companyName: string
 }) => {
   const isMaster = currentUser.role === UserRole.MASTER_ROOT;
   const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CEO || isMaster;
   const isStudent = !isAdmin;
 
+  // Lógica para el Logo Dinámico (Primera letra del nombre de la empresa)
+  const logoLetter = companyName ? companyName.charAt(0).toUpperCase() : 'S';
+
   const menuItems = [
-    { id: AppRoute.DASHBOARD, label: isStudent ? 'Capacitaciones' : 'Dashboard', icon: isStudent ? 'fa-graduation-cap' : 'fa-chart-line' },
+    { id: AppRoute.DASHBOARD, label: isStudent ? 'Capacitaciones' : 'Portal Clases', icon: 'fa-graduation-cap' },
   ];
 
   if (isAdmin) {
       menuItems.push(
         { id: AppRoute.PROJECTS, label: 'Proyectos', icon: 'fa-folder-open' },
-        { id: AppRoute.TEAM, label: 'Equipo', icon: 'fa-users' },
+        { id: AppRoute.TEAM, label: 'Equipo & Alumnos', icon: 'fa-users' }, // Nombre actualizado
         { id: AppRoute.REPORTS, label: 'Informes', icon: 'fa-file-contract' }
       );
   }
@@ -39,13 +44,14 @@ export const Sidebar = ({
 
   return (
     <div className="w-64 bg-SIMPLEDATA-900 text-slate-300 hidden lg:flex flex-col h-screen fixed left-0 top-0 shadow-xl z-20 print:hidden">
+      {/* Dynamic Header */}
       <div className="p-6 flex items-center gap-3 border-b border-SIMPLEDATA-800">
-        <div className="w-10 h-10 bg-gradient-to-br from-SIMPLEDATA-500 to-SIMPLEDATA-accent rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg">
-          A
+        <div className="w-10 h-10 bg-gradient-to-br from-SIMPLEDATA-500 to-SIMPLEDATA-accent rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shrink-0">
+          {logoLetter}
         </div>
-        <div>
-          <h1 className="text-white font-bold tracking-tight">SIMPLEDATA</h1>
-          <p className="text-xs text-SIMPLEDATA-accent uppercase tracking-wider">Portal V2</p>
+        <div className="overflow-hidden">
+          <h1 className="text-white font-bold tracking-tight truncate text-sm" title={companyName}>{companyName}</h1>
+          <p className="text-[10px] text-SIMPLEDATA-accent uppercase tracking-wider">LMS Platform</p>
         </div>
       </div>
 

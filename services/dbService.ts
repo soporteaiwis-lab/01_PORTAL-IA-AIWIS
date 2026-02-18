@@ -269,6 +269,7 @@ export class DBService {
           case 'PROJECTS': return this.projects;
           case 'GEMS': return this.gems;
           case 'TOOLS': return this.tools;
+          case 'MODULES': return this.modules; // Added MODULES here
           default: return [];
       }
   }
@@ -283,12 +284,19 @@ export class DBService {
               return rest;
           }
       });
-      const map: any = { 'USERS': 'app_users', 'PROJECTS': 'app_projects', 'GEMS': 'app_gems', 'TOOLS': 'app_tools' };
+      const map: any = { 
+          'USERS': 'app_users', 
+          'PROJECTS': 'app_projects', 
+          'GEMS': 'app_gems', 
+          'TOOLS': 'app_tools',
+          'MODULES': 'app_training_modules' 
+      };
       const internalName = map[tableName];
       
       if (internalName) {
           if (tableName === 'USERS') this.users = updatedData;
           if (tableName === 'PROJECTS') this.projects = updatedData;
+          if (tableName === 'MODULES') this.modules = updatedData;
           this.saveLocal();
           
           if (this.cloudSqlConfig.isActive) {

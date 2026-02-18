@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
+import { User, UserRole, TrainingModule } from '../types';
 
 const Icon = ({ name, className = "" }: { name: string, className?: string }) => (
   <i className={`fa-solid ${name} ${className}`}></i>
@@ -10,19 +10,24 @@ export const TeamView = ({
     currentUser,
     onAddUser, 
     onUpdateUser,
-    onDeleteUser 
+    onDeleteUser,
+    modules // New Prop for calculating progress
 }: { 
     users: User[], 
     currentUser: User,
     onAddUser: (u: User) => void, 
     onUpdateUser: (u: User) => void,
-    onDeleteUser: (id: string) => void 
+    onDeleteUser: (id: string) => void,
+    modules: TrainingModule[]
 }) => {
    const [editingUser, setEditingUser] = useState<User | null>(null);
    const [isAdding, setIsAdding] = useState(false);
    const [formData, setFormData] = useState<Partial<User>>({});
 
-   const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CEO;
+   const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CEO || currentUser.role === UserRole.MASTER_ROOT;
+
+   // Calculate total available videos in the system
+   const totalVideos = modules.reduce((acc, mod) => acc + mod.videos.length, 0);
 
    // ESC Listener
    useEffect(() => {
@@ -48,7 +53,7 @@ export const TeamView = ({
        if (!checkPermission()) return;
        setIsAdding(true);
        setEditingUser(null);
-       setFormData({ name: '', role: UserRole.DEVELOPER, skills: [], email: '', avatar: 'https://ui-avatars.com/api/?name=New+User' });
+       setFormData({ name: '', role: UserRole.STUDENT, skills: [], email: '', avatar: 'https://ui-avatars.com/api/?name=New+User' });
    };
 
    const handleEditClick = (u: User) => {
@@ -95,41 +100,58 @@ export const TeamView = ({
    return (
     <div className="space-y-6 print:hidden pb-24 md:pb-0">
       <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-SIMPLEDATA-900">Equipo</h2>
+          <h2 className="text-2xl font-bold text-SIMPLEDATA-900">Equipo y Alumnos</h2>
           <button onClick={handleAddClick} className="bg-SIMPLEDATA-600 hover:bg-SIMPLEDATA-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
               <Icon name="fa-plus" /> Agregar
           </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {users.map(user => (
-          <div key={user.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col items-center relative group">
-             <div className="absolute top-2 right-2 flex gap-1">
-                 <button onClick={() => handleEditClick(user)} className="text-slate-300 hover:text-blue-500 p-2"><Icon name="fa-pen" /></button>
-                 <button onClick={() => handleDeleteClick(user.id)} className="text-slate-300 hover:text-red-500 p-2"><Icon name="fa-trash" /></button>
-             </div>
-             
-             <div className="flex flex-col md:flex-row items-center gap-4 w-full mb-4">
-                 <img src={user.avatar} className="w-20 h-20 md:w-16 md:h-16 rounded-full border-4 border-slate-50" />
-                 <div className="text-center md:text-left">
-                     <h3 className="text-lg font-bold text-slate-900 leading-tight">{user.name}</h3>
-                     <p className="text-SIMPLEDATA-600 font-medium text-sm">{user.role}</p>
-                     <p className="text-slate-400 text-xs mt-1">{user.projects.length} Proyectos Activos</p>
+        {users.map(user => {
+            const completedCount = user.completedVideoIds ? user.completedVideoIds.length : 0;
+            const progressPercent = totalVideos > 0 ? Math.round((completedCount / totalVideos) * 100) : 0;
+            
+            return (
+              <div key={user.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col items-center relative group">
+                 <div className="absolute top-2 right-2 flex gap-1">
+                     <button onClick={() => handleEditClick(user)} className="text-slate-300 hover:text-blue-500 p-2"><Icon name="fa-pen" /></button>
+                     <button onClick={() => handleDeleteClick(user.id)} className="text-slate-300 hover:text-red-500 p-2"><Icon name="fa-trash" /></button>
                  </div>
-             </div>
+                 
+                 <div className="flex flex-col md:flex-row items-center gap-4 w-full mb-4">
+                     <img src={user.avatar} className="w-20 h-20 md:w-16 md:h-16 rounded-full border-4 border-slate-50" />
+                     <div className="text-center md:text-left min-w-0 flex-1">
+                         <h3 className="text-lg font-bold text-slate-900 leading-tight truncate">{user.name}</h3>
+                         <p className="text-SIMPLEDATA-600 font-medium text-sm">{user.role}</p>
+                         <p className="text-slate-400 text-xs mt-1 truncate">{user.email}</p>
+                     </div>
+                 </div>
 
-             <div className="w-full bg-slate-50 rounded-lg p-3">
-                 <p className="text-xs font-bold text-slate-400 uppercase mb-2">Habilidades Principales</p>
-                 <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                     {user.skills.slice(0, 3).map((skill, idx) => (
-                         <span key={idx} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 font-medium">
-                             {skill.name} <span className="text-SIMPLEDATA-400 text-[10px] ml-1">{skill.level}%</span>
-                         </span>
-                     ))}
+                 {/* Progress Section */}
+                 <div className="w-full mb-4">
+                     <div className="flex justify-between text-xs mb-1 font-bold text-slate-500">
+                         <span>Avance Capacitación</span>
+                         <span>{progressPercent}% ({completedCount}/{totalVideos})</span>
+                     </div>
+                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                         <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+                     </div>
                  </div>
-             </div>
-          </div>
-        ))}
+
+                 <div className="w-full bg-slate-50 rounded-lg p-3 mt-auto">
+                     <p className="text-xs font-bold text-slate-400 uppercase mb-2">Habilidades Principales</p>
+                     <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                         {user.skills.slice(0, 3).map((skill, idx) => (
+                             <span key={idx} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 font-medium">
+                                 {skill.name} <span className="text-SIMPLEDATA-400 text-[10px] ml-1">{skill.level}%</span>
+                             </span>
+                         ))}
+                         {user.skills.length === 0 && <span className="text-xs text-slate-400 italic">Sin habilidades registradas</span>}
+                     </div>
+                 </div>
+              </div>
+            )
+        })}
       </div>
 
       {/* Edit/Add Modal - OPTIMIZED */}
@@ -144,11 +166,13 @@ export const TeamView = ({
                       <input className="w-full border p-2 rounded" placeholder="Nombre" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
                       <input className="w-full border p-2 rounded" placeholder="Email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
                       <select className="w-full border p-2 rounded" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})}>
+                            <option value={UserRole.STUDENT}>Estudiante / Capacitado</option>
                             <option value={UserRole.DEVELOPER}>Desarrollador</option>
                             <option value={UserRole.PROJECT_MANAGER}>Project Manager</option>
                             <option value={UserRole.CEO}>CEO</option>
                             <option value={UserRole.DESIGNER}>Diseñador</option>
                             <option value={UserRole.ANALYST}>Analista</option>
+                            <option value={UserRole.ADMIN}>Admin</option>
                       </select>
                       
                       <div>

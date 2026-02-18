@@ -21,8 +21,11 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
   const [watchedVideos, setWatchedVideos] = useState<string[]>(currentUser.completedVideoIds || []);
 
   // Master Root Edit Modes
-  const [editingModule, setEditingModule] = useState<TrainingModule | null>(null);
   const [isAddingVideo, setIsAddingVideo] = useState<{modId: string} | null>(null);
+  
+  // Edit States
+  const [editingModule, setEditingModule] = useState<TrainingModule | null>(null);
+  const [editingVideo, setEditingVideo] = useState<{modId: string, vid: TrainingVideo} | null>(null);
 
   useEffect(() => {
       loadPortalData();
@@ -38,6 +41,8 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
   const handleTitleSave = () => {
       db.saveCompanyConfig(companyConfig);
       setIsEditingTitle(false);
+      // Force reload to update sidebar instantly (quick hack, ideally context)
+      window.location.reload(); 
   };
 
   const handleToggleWatched = async (videoId: string) => {
@@ -58,11 +63,18 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
       const newMod: TrainingModule = {
           id: 'mod_' + Date.now(),
           title,
-          description: 'Descripción pendiente...',
+          description: 'Nueva sección de aprendizaje.',
           videos: [],
           order: modules.length + 1
       };
       await db.addModule(newMod);
+      loadPortalData();
+  };
+
+  const handleUpdateModule = async () => {
+      if (!editingModule) return;
+      await db.updateModule(editingModule);
+      setEditingModule(null);
       loadPortalData();
   };
 
@@ -73,15 +85,16 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
       }
   };
 
-  const handleSaveVideo = async (modId: string, title: string, url: string, type: 'video'|'meet') => {
+  const handleSaveVideo = async (modId: string, title: string, url: string, type: 'video'|'meet', duration?: string) => {
       const module = modules.find(m => m.id === modId);
       if (!module) return;
+      
       const newVideo: TrainingVideo = {
           id: 'v_' + Date.now(),
           title,
           url,
           type,
-          duration: 'Pending'
+          duration: duration || '10 min'
       };
       const updatedMod = { ...module, videos: [...module.videos, newVideo] };
       await db.updateModule(updatedMod);
@@ -89,13 +102,34 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
       setIsAddingVideo(null);
   };
 
+  const handleUpdateVideo = async () => {
+      if (!editingVideo) return;
+      const module = modules.find(m => m.id === editingVideo.modId);
+      if (!module) return;
+
+      const updatedVideos = module.videos.map(v => v.id === editingVideo.vid.id ? editingVideo.vid : v);
+      await db.updateModule({ ...module, videos: updatedVideos });
+      setEditingVideo(null);
+      loadPortalData();
+  };
+
+  const handleDeleteVideo = async (modId: string, vidId: string) => {
+      if (!confirm("¿Borrar clase?")) return;
+      const module = modules.find(m => m.id === modId);
+      if (!module) return;
+      
+      const updatedVideos = module.videos.filter(v => v.id !== vidId);
+      await db.updateModule({ ...module, videos: updatedVideos });
+      loadPortalData();
+  }
+
   // --- RENDER HELPERS ---
   const getEmbedUrl = (url: string) => {
       if (url.includes('youtube.com') || url.includes('youtu.be')) {
           const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           return `https://www.youtube.com/embed/${videoId}`;
       }
-      return url; // Return raw for Meet/Others (will need handling or open in new tab)
+      return url; 
   };
 
   return (
@@ -125,7 +159,7 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
 
           {/* Master Controls */}
           {isMaster && !isEditingTitle && (
-              <button onClick={() => setIsEditingTitle(true)} className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 z-20">
+              <button onClick={() => setIsEditingTitle(true)} className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 z-20 text-xs flex items-center gap-1">
                   <Icon name="fa-pen" /> Editar Título
               </button>
           )}
@@ -161,10 +195,15 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
           {modules.map(module => (
               <div key={module.id} className="relative group/module">
                   <div className="flex justify-between items-end mb-4 px-2">
-                      <div>
+                      <div className="group/title relative">
                           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                               {module.title}
-                              {isMaster && <button onClick={() => handleDeleteModule(module.id)} className="text-xs text-red-300 hover:text-red-500 ml-2"><Icon name="fa-trash"/></button>}
+                              {isMaster && (
+                                  <>
+                                    <button onClick={() => setEditingModule(module)} className="text-xs text-slate-300 hover:text-blue-500"><Icon name="fa-pen"/></button>
+                                    <button onClick={() => handleDeleteModule(module.id)} className="text-xs text-slate-300 hover:text-red-500"><Icon name="fa-trash"/></button>
+                                  </>
+                              )}
                           </h2>
                           <p className="text-sm text-slate-500">{module.description}</p>
                       </div>
@@ -183,7 +222,7 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
                               <div key={video.id} className="snap-start shrink-0 w-[300px] md:w-[350px] bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden hover:shadow-xl transition-all relative flex flex-col group/card">
                                   
                                   {/* Thumbnail / Video Placeholder */}
-                                  <div className="h-44 bg-slate-900 relative flex items-center justify-center">
+                                  <div className="h-44 bg-slate-900 relative flex items-center justify-center overflow-hidden">
                                       {video.url.includes('youtube') ? (
                                            <img 
                                               src={`https://img.youtube.com/vi/${video.url.split('v=')[1]?.split('&')[0]}/hqdefault.jpg`} 
@@ -201,6 +240,14 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
                                       <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
                                           {video.duration}
                                       </div>
+
+                                      {/* MASTER EDIT VIDEO */}
+                                      {isMaster && (
+                                          <div className="absolute top-2 right-2 flex gap-1 z-20">
+                                              <button onClick={() => setEditingVideo({modId: module.id, vid: video})} className="w-6 h-6 bg-slate-800 hover:bg-blue-600 text-white rounded text-[10px] flex items-center justify-center"><Icon name="fa-pen"/></button>
+                                              <button onClick={() => handleDeleteVideo(module.id, video.id)} className="w-6 h-6 bg-slate-800 hover:bg-red-600 text-white rounded text-[10px] flex items-center justify-center"><Icon name="fa-trash"/></button>
+                                          </div>
+                                      )}
                                   </div>
 
                                   {/* Content */}
@@ -247,20 +294,81 @@ export const Dashboard = ({ currentUser, projects }: { currentUser: User, projec
       {/* Add Video Modal */}
       {isAddingVideo && (
           <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4">
-              <div className="bg-white p-6 rounded-xl w-full max-w-md">
+              <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
                   <h3 className="font-bold text-lg mb-4">Agregar Video a Módulo</h3>
                   <form onSubmit={(e) => {
                       e.preventDefault();
                       const t = e.target as any;
-                      handleSaveVideo(isAddingVideo.modId, t.title.value, t.url.value, 'video');
+                      handleSaveVideo(isAddingVideo.modId, t.title.value, t.url.value, 'video', t.duration.value);
                   }}>
-                      <input name="title" className="w-full border p-2 rounded mb-2" placeholder="Título de la clase" required />
-                      <input name="url" className="w-full border p-2 rounded mb-4" placeholder="URL (YouTube / Meet)" required />
+                      <label className="text-xs font-bold text-slate-500 uppercase">Título</label>
+                      <input name="title" className="w-full border p-2 rounded mb-2" required />
+                      
+                      <label className="text-xs font-bold text-slate-500 uppercase">URL (Youtube/Meet)</label>
+                      <input name="url" className="w-full border p-2 rounded mb-2" required />
+                      
+                      <label className="text-xs font-bold text-slate-500 uppercase">Duración (Ej: 15 min)</label>
+                      <input name="duration" className="w-full border p-2 rounded mb-4" placeholder="10 min" />
+
                       <div className="flex justify-end gap-2">
                           <button type="button" onClick={() => setIsAddingVideo(null)} className="px-3 py-1 text-slate-500">Cancelar</button>
                           <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded font-bold">Guardar</button>
                       </div>
                   </form>
+              </div>
+          </div>
+      )}
+
+      {/* Edit Module Modal */}
+      {editingModule && (
+          <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4">
+              <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
+                  <h3 className="font-bold text-lg mb-4">Editar Módulo</h3>
+                  <div className="space-y-4">
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Título</label>
+                          <input className="w-full border p-2 rounded" value={editingModule.title} onChange={e => setEditingModule({...editingModule, title: e.target.value})} />
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Descripción</label>
+                          <textarea className="w-full border p-2 rounded h-20" value={editingModule.description} onChange={e => setEditingModule({...editingModule, description: e.target.value})} />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                          <button onClick={() => setEditingModule(null)} className="px-3 py-1 text-slate-500">Cancelar</button>
+                          <button onClick={handleUpdateModule} className="px-3 py-1 bg-blue-600 text-white rounded font-bold">Guardar</button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Edit Video Modal */}
+      {editingVideo && (
+          <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4">
+              <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
+                  <h3 className="font-bold text-lg mb-4">Editar Video</h3>
+                  <div className="space-y-4">
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Título</label>
+                          <input className="w-full border p-2 rounded" value={editingVideo.vid.title} onChange={e => setEditingVideo({...editingVideo, vid: {...editingVideo.vid, title: e.target.value}})} />
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">URL</label>
+                          <input className="w-full border p-2 rounded" value={editingVideo.vid.url} onChange={e => setEditingVideo({...editingVideo, vid: {...editingVideo.vid, url: e.target.value}})} />
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Duración</label>
+                          <input className="w-full border p-2 rounded" value={editingVideo.vid.duration} onChange={e => setEditingVideo({...editingVideo, vid: {...editingVideo.vid, duration: e.target.value}})} />
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">URL Quiz (Opcional)</label>
+                          <input className="w-full border p-2 rounded" value={editingVideo.vid.quizUrl || ''} onChange={e => setEditingVideo({...editingVideo, vid: {...editingVideo.vid, quizUrl: e.target.value}})} />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                          <button onClick={() => setEditingVideo(null)} className="px-3 py-1 text-slate-500">Cancelar</button>
+                          <button onClick={handleUpdateVideo} className="px-3 py-1 bg-blue-600 text-white rounded font-bold">Guardar</button>
+                      </div>
+                  </div>
               </div>
           </div>
       )}

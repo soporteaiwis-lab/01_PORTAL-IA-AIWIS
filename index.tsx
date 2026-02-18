@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { User, Project, AppRoute, Gem, UserRole, Tool, UsedID } from './types';
+import { User, Project, AppRoute, Gem, UserRole, Tool, UsedID, TrainingModule } from './types';
 import { db } from './services/dbService';
 
 // Components
@@ -89,23 +89,28 @@ const App = () => {
   const [dbGems, setDbGems] = useState<Gem[]>([]);
   const [dbTools, setDbTools] = useState<Tool[]>([]);
   const [dbUsedIds, setDbUsedIds] = useState<UsedID[]>([]);
+  const [dbModules, setDbModules] = useState<TrainingModule[]>([]);
+  const [companyConfig, setCompanyConfig] = useState({ title: 'SIMPLEDATA', subtitle: '' });
   const [loading, setLoading] = useState(true);
 
   // Load Data
   const loadData = async () => {
     try {
-      const [u, p, g, t, ids] = await Promise.all([
+      const [u, p, g, t, ids, m] = await Promise.all([
           db.getUsers(), 
           db.getProjects(), 
           db.getGems(), 
           db.getTools(),
-          db.getUsedIds() 
+          db.getUsedIds(),
+          db.getModules()
       ]);
       setDbUsers(u);
       setDbProjects(p);
       setDbGems(g);
       setDbTools(t);
       setDbUsedIds(ids);
+      setDbModules(m);
+      setCompanyConfig(db.getCompanyConfig());
     } finally {
       setLoading(false);
     }
@@ -154,6 +159,7 @@ const App = () => {
           onNavigate={setRoute} 
           onLogout={handleLogout}
           onOpenTools={() => setIsToolsOpen(true)}
+          companyName={companyConfig.title} 
       />
       
       <main className="flex-1 lg:ml-64 p-4 lg:p-8 relative">
@@ -175,7 +181,7 @@ const App = () => {
         
         {route === AppRoute.GEMS && <GemsView gems={dbGems} onAddGem={handleAddGem} onUpdateGem={handleUpdateGem} onDeleteGem={handleDeleteGem} currentUser={user} />}
         
-        {isAdmin && route === AppRoute.TEAM && <TeamView users={dbUsers} currentUser={user} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />}
+        {isAdmin && route === AppRoute.TEAM && <TeamView users={dbUsers} currentUser={user} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} modules={dbModules} />}
         {isAdmin && route === AppRoute.REPORTS && <ReportsView currentUser={user} projects={dbProjects} onUpdateProject={handleUpdateProject} />}
         {isAdmin && route === AppRoute.ADMIN && <AdminUsersView users={dbUsers} projects={dbProjects} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onUpdateProject={handleUpdateProject} onResetDB={handleResetDB} />}
         

@@ -6,8 +6,8 @@ const Icon = ({ name, className = "", onClick }: { name: string, className?: str
   <i className={`fa-solid ${name} ${className}`} onClick={onClick}></i>
 );
 
-// Constants for Tables
-const TABLES = ['USERS', 'PROJECTS', 'USED_IDS', 'GEMS', 'TOOLS'];
+// Constants for Tables - Added MODULES
+const TABLES = ['USERS', 'PROJECTS', 'USED_IDS', 'GEMS', 'TOOLS', 'MODULES'];
 
 export const DatabaseView = () => {
   const [activeTable, setActiveTable] = useState<string>('USERS');
@@ -16,6 +16,7 @@ export const DatabaseView = () => {
   const [statusMsg, setStatusMsg] = useState('');
   const [consoleOutput, setConsoleOutput] = useState<string[]>(['> SIMPLEDATA Maestro Engine v2.1 initialized...', '> Waiting for commands.']);
   
+  // ... (rest of the file remains similar, but using the updated TABLES constant)
   // DDL State
   const [newColumnName, setNewColumnName] = useState('');
   
@@ -332,7 +333,8 @@ exports.simpleDataProxy = async (req, res) => {
                             </table>
                         </div>
                     )}
-
+                    
+                    {/* ... Rest of existing file ... */}
                     {viewMode === 'STRUCT' && (
                         <div className="max-w-2xl mx-auto">
                             <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 mb-6">
@@ -351,10 +353,12 @@ exports.simpleDataProxy = async (req, res) => {
                             </div>
                         </div>
                     )}
-
+                    
+                    {/* ... CLOUDSQL View Section (Hidden for brevity, same as previous) ... */}
                     {viewMode === 'CLOUDSQL' && (
                         <div className="max-w-4xl mx-auto h-full flex flex-col">
-                            {/* SQL SUB-TABS */}
+                             {/* ... Config/Deploy logic same as before ... */}
+                              {/* SQL SUB-TABS */}
                             <div className="flex gap-4 mb-6 border-b border-slate-700 pb-2">
                                 <button onClick={() => setSqlTab('CONFIG')} className={`pb-2 text-sm font-bold ${sqlTab === 'CONFIG' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-slate-500'}`}>1. Configuración de Instancia</button>
                                 <button onClick={() => setSqlTab('DEPLOY')} className={`pb-2 text-sm font-bold ${sqlTab === 'DEPLOY' ? 'text-green-400 border-b-2 border-green-400' : 'text-slate-500'}`}>2. Despliegue de Agente</button>
@@ -454,7 +458,7 @@ exports.simpleDataProxy = async (req, res) => {
                                 </div>
                             )}
 
-                            {sqlTab === 'DEPLOY' && (
+                             {sqlTab === 'DEPLOY' && (
                                 <div className="space-y-6 animate-fade-in h-full flex flex-col">
                                     <div className="bg-slate-900 p-6 rounded-xl border border-green-900/30 shadow-lg flex-1 flex flex-col">
                                         <div className="mb-4">
