@@ -6,13 +6,13 @@ import { db } from './services/dbService';
 // Components
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
-import { Dashboard } from './components/Dashboard';
+import { Dashboard } from './components/Dashboard'; // Now the Training Portal
 import { ProjectsView } from './components/ProjectsView';
 import { GemsView } from './components/GemsView';
 import { TeamView } from './components/TeamView';
 import { ReportsView } from './components/ReportsView';
 import { AdminUsersView } from './components/AdminUsersView';
-import { DatabaseView } from './components/DatabaseView'; // NEW IMPORT
+import { DatabaseView } from './components/DatabaseView'; 
 import { ToolsModal } from './components/ToolsModal';
 import { LoginScreen } from './components/LoginScreen';
 
@@ -99,7 +99,7 @@ const App = () => {
           db.getProjects(), 
           db.getGems(), 
           db.getTools(),
-          db.getUsedIds() // NEW: Get used ids history
+          db.getUsedIds() 
       ]);
       setDbUsers(u);
       setDbProjects(p);
@@ -120,7 +120,7 @@ const App = () => {
   const handleAddProject = async (p: Project) => { await db.addProject(p); loadData(); };
   const handleUpdateProject = async (p: Project) => { await db.updateProject(p); loadData(); };
   const handleDeleteProject = async (id: string) => { await db.deleteProject(id); loadData(); };
-  const handleRegisterUsedId = async (record: UsedID) => { await db.registerUsedId(record); loadData(); }; // NEW handler
+  const handleRegisterUsedId = async (record: UsedID) => { await db.registerUsedId(record); loadData(); }; 
   
   const handleAddGem = async (g: Gem) => { await db.addGem(g); loadData(); };
   const handleUpdateGem = async (g: Gem) => { await db.updateGem(g); loadData(); };
@@ -139,6 +139,9 @@ const App = () => {
       window.location.reload();
   };
 
+  const isMaster = user?.role === UserRole.MASTER_ROOT;
+  const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.CEO || isMaster;
+
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-100 text-SIMPLEDATA-600"><Icon name="fa-circle-notch" className="text-3xl animate-spin" /></div>;
 
   if (!user) return <LoginScreen users={dbUsers} onLogin={handleLogin} />;
@@ -155,7 +158,9 @@ const App = () => {
       
       <main className="flex-1 lg:ml-64 p-4 lg:p-8 relative">
         {route === AppRoute.DASHBOARD && <Dashboard currentUser={user} projects={dbProjects} />}
-        {route === AppRoute.PROJECTS && (
+        
+        {/* Route Protection: Only Admins see Projects/Reports/Team */}
+        {isAdmin && route === AppRoute.PROJECTS && (
             <ProjectsView 
                 projects={dbProjects} 
                 users={dbUsers} 
@@ -163,19 +168,19 @@ const App = () => {
                 onAddProject={handleAddProject} 
                 onDeleteProject={handleDeleteProject} 
                 onUpdateProject={handleUpdateProject}
-                usedIds={dbUsedIds} // Pass the used IDs history
-                onRegisterId={handleRegisterUsedId} // Pass the register function
+                usedIds={dbUsedIds} 
+                onRegisterId={handleRegisterUsedId} 
             />
         )}
-        {route === AppRoute.GEMS && <GemsView gems={dbGems} onAddGem={handleAddGem} onUpdateGem={handleUpdateGem} onDeleteGem={handleDeleteGem} currentUser={user} />}
-        {route === AppRoute.TEAM && <TeamView users={dbUsers} currentUser={user} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />}
-        {route === AppRoute.REPORTS && <ReportsView currentUser={user} projects={dbProjects} onUpdateProject={handleUpdateProject} />}
-        {route === AppRoute.ADMIN && <AdminUsersView users={dbUsers} projects={dbProjects} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onUpdateProject={handleUpdateProject} onResetDB={handleResetDB} />}
         
-        {/* DATABASE VIEW ROUTE */}
-        {route === AppRoute.DATABASE && (user.role === UserRole.ADMIN || user.role === UserRole.CEO) && <DatabaseView />}
-        {route === AppRoute.DATABASE && !(user.role === UserRole.ADMIN || user.role === UserRole.CEO) && <div className="p-10 text-center text-red-500 font-bold">Acceso Restringido</div>}
-
+        {route === AppRoute.GEMS && <GemsView gems={dbGems} onAddGem={handleAddGem} onUpdateGem={handleUpdateGem} onDeleteGem={handleDeleteGem} currentUser={user} />}
+        
+        {isAdmin && route === AppRoute.TEAM && <TeamView users={dbUsers} currentUser={user} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />}
+        {isAdmin && route === AppRoute.REPORTS && <ReportsView currentUser={user} projects={dbProjects} onUpdateProject={handleUpdateProject} />}
+        {isAdmin && route === AppRoute.ADMIN && <AdminUsersView users={dbUsers} projects={dbProjects} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onUpdateProject={handleUpdateProject} onResetDB={handleResetDB} />}
+        
+        {isAdmin && route === AppRoute.DATABASE && <DatabaseView />}
+        
         {/* Floating Chat Button */}
         <button 
           onClick={() => setIsChatOpen(!isChatOpen)}

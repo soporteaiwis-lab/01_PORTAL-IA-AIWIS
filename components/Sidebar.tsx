@@ -18,18 +18,26 @@ export const Sidebar = ({
   onLogout: () => void,
   onOpenTools: () => void
 }) => {
+  const isMaster = currentUser.role === UserRole.MASTER_ROOT;
+  const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CEO || isMaster;
+  const isStudent = !isAdmin;
+
   const menuItems = [
-    { id: AppRoute.DASHBOARD, label: 'Dashboard', icon: 'fa-chart-line' },
-    { id: AppRoute.PROJECTS, label: 'Proyectos', icon: 'fa-folder-open' },
-    { id: AppRoute.GEMS, label: 'Mis Gemas', icon: 'fa-gem' },
-    { id: AppRoute.TEAM, label: 'Equipo', icon: 'fa-users' },
-    { id: AppRoute.REPORTS, label: 'Informes', icon: 'fa-file-contract' },
+    { id: AppRoute.DASHBOARD, label: isStudent ? 'Capacitaciones' : 'Dashboard', icon: isStudent ? 'fa-graduation-cap' : 'fa-chart-line' },
   ];
 
-  const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CEO;
+  if (isAdmin) {
+      menuItems.push(
+        { id: AppRoute.PROJECTS, label: 'Proyectos', icon: 'fa-folder-open' },
+        { id: AppRoute.TEAM, label: 'Equipo', icon: 'fa-users' },
+        { id: AppRoute.REPORTS, label: 'Informes', icon: 'fa-file-contract' }
+      );
+  }
+  
+  // Everyone sees Gems
+  menuItems.push({ id: AppRoute.GEMS, label: 'Mis Gemas', icon: 'fa-gem' });
 
   return (
-    // CAMBIO CLAVE: 'hidden lg:flex'. Solo se muestra en pantallas GRANDES (lg). Oculto en móbiles.
     <div className="w-64 bg-SIMPLEDATA-900 text-slate-300 hidden lg:flex flex-col h-screen fixed left-0 top-0 shadow-xl z-20 print:hidden">
       <div className="p-6 flex items-center gap-3 border-b border-SIMPLEDATA-800">
         <div className="w-10 h-10 bg-gradient-to-br from-SIMPLEDATA-500 to-SIMPLEDATA-accent rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg">
@@ -37,7 +45,7 @@ export const Sidebar = ({
         </div>
         <div>
           <h1 className="text-white font-bold tracking-tight">SIMPLEDATA</h1>
-          <p className="text-xs text-SIMPLEDATA-accent uppercase tracking-wider">Portal Beta 1.0</p>
+          <p className="text-xs text-SIMPLEDATA-accent uppercase tracking-wider">Portal V2</p>
         </div>
       </div>
 
@@ -57,7 +65,7 @@ export const Sidebar = ({
           </button>
         ))}
         
-        {/* Admin Link - Only for Admins */}
+        {/* Admin Links */}
         {isAdmin && (
              <>
              <button
@@ -86,7 +94,6 @@ export const Sidebar = ({
              </>
         )}
 
-        {/* Tools Button separate in Desktop */}
         <button
             onClick={onOpenTools}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-SIMPLEDATA-800 hover:text-white transition-all group mt-4 border border-SIMPLEDATA-800"

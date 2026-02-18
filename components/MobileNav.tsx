@@ -6,22 +6,35 @@ const Icon = ({ name, className = "" }: { name: string, className?: string }) =>
 );
 
 export const MobileNav = ({ currentRoute, onNavigate, currentUser }: { currentRoute: AppRoute, onNavigate: (r: AppRoute) => void, currentUser: User | null }) => {
-  const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.CEO;
+  const isMaster = currentUser?.role === UserRole.MASTER_ROOT;
+  const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.CEO || isMaster;
+  const isStudent = !isAdmin;
 
-  const items = [
-    { id: AppRoute.DASHBOARD, icon: 'fa-chart-line', label: 'Inicio' },
-    { id: AppRoute.PROJECTS, icon: 'fa-folder-open', label: 'Proy.' },
-    { id: AppRoute.TOOLS, icon: 'fa-toolbox', label: 'Tools', highlight: true },
-    { id: AppRoute.REPORTS, icon: 'fa-file-contract', label: 'Docs' },
-    { id: AppRoute.TEAM, icon: 'fa-users', label: 'Equipo' },
+  interface NavItem {
+    id: AppRoute;
+    icon: string;
+    label: string;
+    highlight?: boolean;
+  }
+
+  const items: NavItem[] = [
+    { id: AppRoute.DASHBOARD, icon: isStudent ? 'fa-graduation-cap' : 'fa-chart-line', label: isStudent ? 'Clases' : 'Inicio' },
   ];
+
+  if (isAdmin) {
+      items.push({ id: AppRoute.PROJECTS, icon: 'fa-folder-open', label: 'Proy.' });
+      items.push({ id: AppRoute.REPORTS, icon: 'fa-file-contract', label: 'Docs' });
+      items.push({ id: AppRoute.TEAM, icon: 'fa-users', label: 'Equipo' });
+  }
+
+  // Common items
+  items.push({ id: AppRoute.TOOLS, icon: 'fa-toolbox', label: 'Tools', highlight: true });
 
   if (isAdmin) {
       items.push({ id: AppRoute.ADMIN, icon: 'fa-user-shield', label: 'Admin' });
   }
 
   return (
-    // CAMBIO CLAVE: 'lg:hidden'. Se muestra en todo menos en pantallas grandes.
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 lg:hidden z-50 flex justify-around items-center px-2 py-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] safe-area-pb overflow-x-auto">
       {items.map(item => {
         const isActive = currentRoute === item.id;

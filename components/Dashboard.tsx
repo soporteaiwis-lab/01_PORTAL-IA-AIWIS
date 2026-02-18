@@ -1,270 +1,272 @@
 import React, { useState, useEffect } from 'react';
-import { User, Project } from '../types';
-import { APP_CONFIG } from '../constants'; // Import to check status
+import { User, Project, UserRole, TrainingModule, TrainingVideo } from '../types';
+import { db } from '../services/dbService';
+import { StudyGuideModal } from './StudyGuideModal';
 
 const Icon = ({ name, className = "" }: { name: string, className?: string }) => (
   <i className={`fa-solid ${name} ${className}`}></i>
 );
 
 export const Dashboard = ({ currentUser, projects }: { currentUser: User, projects: Project[] }) => {
-  // LOGIC FIX: Filter projects where the user is either the Lead OR in the Team list.
-  // Updated for new Statuses: Count anything NOT 'Finalizado' as Active.
-  const myActiveProjects = projects.filter(p => 
-      p.status !== 'Finalizado' && 
-      (p.leadId === currentUser.id || p.teamIds?.includes(currentUser.id))
-  );
+  const isMaster = currentUser.role === UserRole.MASTER_ROOT;
+  const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CEO || isMaster;
   
-  const totalSystemProjects = projects.filter(p => p.status !== 'Finalizado');
+  // State for Training Portal
+  const [modules, setModules] = useState<TrainingModule[]>([]);
+  const [companyConfig, setCompanyConfig] = useState({ title: 'PORTAL CORPORATIVO', subtitle: 'Centro de Capacitación' });
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [showStudyGuide, setShowStudyGuide] = useState(false);
   
-  // Check System Status
-  const isGeminiReady = !!APP_CONFIG.GEMINI_API_KEY && APP_CONFIG.GEMINI_API_KEY.length > 5;
-  const isGithubReady = !!APP_CONFIG.GITHUB_TOKEN && APP_CONFIG.GITHUB_TOKEN.length > 5;
-  const isDriveReady = !!APP_CONFIG.GOOGLE_CLIENT_ID && APP_CONFIG.GOOGLE_CLIENT_ID.length > 5;
+  // Completed Videos tracking (Local State for UI update)
+  const [watchedVideos, setWatchedVideos] = useState<string[]>(currentUser.completedVideoIds || []);
 
-  // Settings Modal State
-  const [showConfig, setShowConfig] = useState(false);
-  
-  // UPDATED: Pre-fill with APP_CONFIG values (which now include hardcoded keys)
-  const [manualKeys, setManualKeys] = useState({
-      apiKey: localStorage.getItem('SIMPLEDATA_env_API_KEY') || APP_CONFIG.GEMINI_API_KEY || '',
-      githubToken: localStorage.getItem('SIMPLEDATA_env_GITHUB_TOKEN') || APP_CONFIG.GITHUB_TOKEN || '',
-      googleClientId: localStorage.getItem('SIMPLEDATA_env_GOOGLE_CLIENT_ID') || APP_CONFIG.GOOGLE_CLIENT_ID || ''
-  });
+  // Master Root Edit Modes
+  const [editingModule, setEditingModule] = useState<TrainingModule | null>(null);
+  const [isAddingVideo, setIsAddingVideo] = useState<{modId: string} | null>(null);
 
-  // ESC Listener
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowConfig(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+      loadPortalData();
   }, []);
 
-  const handleSaveKeys = () => {
-      try {
-          // 1. Guardar Gemini API Key
-          if (manualKeys.apiKey && manualKeys.apiKey.trim() !== '') {
-              localStorage.setItem('SIMPLEDATA_env_API_KEY', manualKeys.apiKey.trim());
-          } else {
-              localStorage.removeItem('SIMPLEDATA_env_API_KEY');
-          }
+  const loadPortalData = async () => {
+      const ms = await db.getModules();
+      const cfg = db.getCompanyConfig();
+      setModules(ms.sort((a,b) => a.order - b.order));
+      setCompanyConfig(cfg);
+  };
 
-          // 2. Guardar GitHub Token (En ambas llaves para asegurar compatibilidad total)
-          if (manualKeys.githubToken && manualKeys.githubToken.trim() !== '') {
-              const token = manualKeys.githubToken.trim();
-              localStorage.setItem('SIMPLEDATA_env_GITHUB_TOKEN', token); // Para APP_CONFIG
-          } else {
-              localStorage.removeItem('SIMPLEDATA_env_GITHUB_TOKEN');
-          }
+  const handleTitleSave = () => {
+      db.saveCompanyConfig(companyConfig);
+      setIsEditingTitle(false);
+  };
 
-          // 3. Guardar Google Client ID (Para Drive OAuth)
-          if (manualKeys.googleClientId && manualKeys.googleClientId.trim() !== '') {
-            localStorage.setItem('SIMPLEDATA_env_GOOGLE_CLIENT_ID', manualKeys.googleClientId.trim());
-          } else {
-            localStorage.removeItem('SIMPLEDATA_env_GOOGLE_CLIENT_ID');
-          }
-          
-          // 4. Feedback y Recarga
-          alert("✅ Configuración guardSIMPLEDATA exitosamente.\n\nEl sistema se reiniciará ahora para aplicar los cambios.");
-          window.location.reload();
-      } catch (e) {
-          console.error(e);
-          alert("Error al guardar en el almacenamiento local del navegador.");
+  const handleToggleWatched = async (videoId: string) => {
+      const newWatched = watchedVideos.includes(videoId) 
+          ? watchedVideos.filter(id => id !== videoId)
+          : [...watchedVideos, videoId];
+      
+      setWatchedVideos(newWatched);
+      
+      const updatedUser = { ...currentUser, completedVideoIds: newWatched };
+      await db.updateUser(updatedUser);
+  };
+
+  // --- MASTER ROOT CRUD ---
+  const handleAddModule = async () => {
+      const title = prompt("Título del Nuevo Módulo:");
+      if (!title) return;
+      const newMod: TrainingModule = {
+          id: 'mod_' + Date.now(),
+          title,
+          description: 'Descripción pendiente...',
+          videos: [],
+          order: modules.length + 1
+      };
+      await db.addModule(newMod);
+      loadPortalData();
+  };
+
+  const handleDeleteModule = async (id: string) => {
+      if(confirm("¿Eliminar módulo y todos sus videos?")) {
+          await db.deleteModule(id);
+          loadPortalData();
       }
   };
 
-  // Helper to get current origin for Google Console
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const handleSaveVideo = async (modId: string, title: string, url: string, type: 'video'|'meet') => {
+      const module = modules.find(m => m.id === modId);
+      if (!module) return;
+      const newVideo: TrainingVideo = {
+          id: 'v_' + Date.now(),
+          title,
+          url,
+          type,
+          duration: 'Pending'
+      };
+      const updatedMod = { ...module, videos: [...module.videos, newVideo] };
+      await db.updateModule(updatedMod);
+      loadPortalData();
+      setIsAddingVideo(null);
+  };
+
+  // --- RENDER HELPERS ---
+  const getEmbedUrl = (url: string) => {
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+          return `https://www.youtube.com/embed/${videoId}`;
+      }
+      return url; // Return raw for Meet/Others (will need handling or open in new tab)
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in print:hidden pb-20 lg:pb-0">
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-8 gap-4">
-        <div>
-          <h2 className="text-2xl lg:text-3xl font-bold text-SIMPLEDATA-900">Hola, {currentUser.name.split(' ')[0]}</h2>
-          <p className="text-slate-500 mt-1 text-sm lg:text-base">Bienvenido al ecosistema corporativo SIMPLEDATA.</p>
-        </div>
-        
-        {/* Header Actions - Responsive Fix */}
-        <div className="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
-             <div className="text-left lg:text-right">
-                <p className="text-xs lg:text-sm font-medium text-slate-400">{new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-             </div>
-
-             <div className="flex items-center gap-3">
-                 {/* System Status Widget (Hidden on Mobile to save space, but dots preserved if needed or hidden entirely) */}
-                 <div className="hidden md:flex items-center gap-3 bg-white p-2 px-4 rounded-xl shadow-sm border border-slate-200">
-                    <div className="flex items-center gap-2" title={isGeminiReady ? "Gemini AI: Conectado" : "Gemini AI: Sin Llave"}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${isGeminiReady ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`}></div>
-                        <span className="text-xs font-bold text-slate-600">AI</span>
-                    </div>
-                    <div className="w-[1px] h-4 bg-slate-200"></div>
-                    <div className="flex items-center gap-2" title={isGithubReady ? "GitHub API: Token Configurado" : "GitHub API: Manual"}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${isGithubReady ? 'bg-green-500' : 'bg-orange-400'}`}></div>
-                        <span className="text-xs font-bold text-slate-600">Git</span>
-                    </div>
-                    <div className="w-[1px] h-4 bg-slate-200"></div>
-                    <div className="flex items-center gap-2" title={isDriveReady ? "Google Drive: Client ID Configurado" : "Google Drive: Sin Client ID"}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${isDriveReady ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                        <span className="text-xs font-bold text-slate-600">Drive</span>
-                    </div>
-                 </div>
-                 
-                 {/* Config Button - ALWAYS VISIBLE */}
-                 <button 
-                    onClick={() => setShowConfig(true)} 
-                    className="w-10 h-10 flex items-center justify-center bg-white text-slate-400 hover:text-SIMPLEDATA-600 rounded-xl shadow-sm border border-slate-200 transition-colors" 
-                    title="Configuración Manual de Llaves"
-                 >
-                    <Icon name="fa-cog" />
-                 </button>
-             </div>
-        </div>
-      </header>
-
-      {/* Google Integrations Bar - Optimized for Mobile (No Scrolling) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 lg:p-6">
-        <h3 className="text-xs lg:text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Integraciones Google Workspace</h3>
-        {/* GRID LAYOUT: 2 cols on mobile, 4 on desktop. No scrolling. */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-          <a href="https://meet.google.com" target="_blank" className="flex items-center gap-3 p-3 rounded-xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-100">
-             <Icon name="fa-video" className="text-xl" />
-             <span className="font-semibold text-sm">Meet</span>
-          </a>
-          <a href="https://mail.google.com" target="_blank" className="flex items-center gap-3 p-3 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 transition-colors border border-red-100">
-             <Icon name="fa-envelope" className="text-xl" />
-             <span className="font-semibold text-sm">Gmail</span>
-          </a>
-          <a href="https://calendar.google.com" target="_blank" className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-100">
-             <Icon name="fa-calendar-alt" className="text-xl" />
-             <span className="font-semibold text-sm">Calendar</span>
-          </a>
-          <a href="https://drive.google.com" target="_blank" className="flex items-center gap-3 p-3 rounded-xl bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition-colors border border-yellow-100">
-             <Icon name="fa-google-drive" className="text-xl" /> 
-             <span className="font-semibold text-sm">Drive</span>
-          </a>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group">
-          <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Icon name="fa-layer-group" className="text-8xl text-blue-600" />
+    <div className="space-y-8 animate-fade-in pb-20 lg:pb-0">
+      
+      {/* HEADER SECTION (EDITABLE BY MASTER) */}
+      <div className="relative bg-white p-8 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none">
+              <Icon name="fa-graduation-cap" className="text-9xl text-SIMPLEDATA-900" />
           </div>
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-              <Icon name="fa-briefcase" className="text-xl" />
-            </div>
-          </div>
-          <h3 className="text-3xl font-bold text-SIMPLEDATA-900 relative z-10">{myActiveProjects.length}</h3>
-          <p className="text-slate-500 text-sm relative z-10 font-medium">Mis Proyectos Activos</p>
-        </div>
-        
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
-              <Icon name="fa-building" className="text-xl" />
-            </div>
-          </div>
-          <h3 className="text-3xl font-bold text-SIMPLEDATA-900">{totalSystemProjects.length}</h3>
-          <p className="text-slate-500 text-sm font-medium">Total Empresa (En Curso)</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-SIMPLEDATA-600 to-SIMPLEDATA-500 p-6 rounded-2xl shadow-lg text-white">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-white/20 rounded-xl">
-              <Icon name="fa-wand-magic-sparkles" className="text-xl" />
-            </div>
-             <div className="flex gap-1">
-                 {isGeminiReady && <span title="AI ConectSIMPLEDATA" className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_5px_rgba(74,222,128,0.8)]"></span>}
-             </div>
-          </div>
-          <h3 className="text-lg font-bold mb-1">SIMPLEDATA AI</h3>
-          <p className="text-white/80 text-sm">{isGeminiReady ? 'Conexión segura establecida.' : 'Modo Offline (Sin API Key)'}</p>
-        </div>
-      </div>
-
-      {/* Manual Configuration Modal - OPTIMIZED */}
-      {showConfig && (
-          <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col md:max-h-[90vh]">
-                  <div className="bg-slate-900 p-4 flex justify-between items-center text-white shrink-0">
-                      <h3 className="font-bold flex items-center gap-2"><Icon name="fa-cogs" /> Configuración de Sistema</h3>
-                      <button onClick={() => setShowConfig(false)} className="hover:text-red-400"><Icon name="fa-times" /></button>
+          
+          <div className="relative z-10">
+              {isEditingTitle ? (
+                  <div className="flex flex-col gap-2 max-w-md">
+                      <input className="text-3xl font-bold border p-2 rounded" value={companyConfig.title} onChange={e => setCompanyConfig({...companyConfig, title: e.target.value})} />
+                      <input className="text-lg text-slate-500 border p-2 rounded" value={companyConfig.subtitle} onChange={e => setCompanyConfig({...companyConfig, subtitle: e.target.value})} />
+                      <button onClick={handleTitleSave} className="bg-green-600 text-white px-4 py-2 rounded font-bold w-fit mt-2">Guardar Cambios</button>
                   </div>
-                  <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              ) : (
+                  <div>
+                      <h1 className="text-3xl md:text-4xl font-bold text-SIMPLEDATA-900 uppercase tracking-tight">{companyConfig.title}</h1>
+                      <p className="text-slate-500 text-lg mt-2">{companyConfig.subtitle}</p>
+                      <p className="text-sm text-slate-400 mt-1">Bienvenido, {currentUser.name}</p>
+                  </div>
+              )}
+          </div>
+
+          {/* Master Controls */}
+          {isMaster && !isEditingTitle && (
+              <button onClick={() => setIsEditingTitle(true)} className="absolute top-4 right-4 text-slate-300 hover:text-blue-500 z-20">
+                  <Icon name="fa-pen" /> Editar Título
+              </button>
+          )}
+
+          {/* Quick Stats for Student */}
+          {!isAdmin && (
+              <div className="mt-6 flex gap-4">
+                  <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg text-sm font-bold border border-green-100">
+                      {watchedVideos.length} Clases Completadas
+                  </div>
+                  <button onClick={() => setShowStudyGuide(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-all flex items-center gap-2">
+                      <Icon name="fa-book-open" /> Ver Guía de Estudios
+                  </button>
+              </div>
+          )}
+      </div>
+
+      {/* MASTER CONTROLS BAR */}
+      {isMaster && (
+          <div className="flex gap-4 p-4 bg-slate-800 rounded-xl text-white items-center">
+              <span className="font-bold text-yellow-400"><Icon name="fa-crown" /> MASTER ROOT:</span>
+              <button onClick={handleAddModule} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-sm font-bold transition-colors">
+                  + Nuevo Módulo
+              </button>
+              <button onClick={() => setShowStudyGuide(true)} className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-sm font-bold transition-colors">
+                  Ver Guía Completa
+              </button>
+          </div>
+      )}
+
+      {/* TRAINING MODULES (NETFLIX STYLE) */}
+      <div className="space-y-12">
+          {modules.map(module => (
+              <div key={module.id} className="relative group/module">
+                  <div className="flex justify-between items-end mb-4 px-2">
+                      <div>
+                          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                              {module.title}
+                              {isMaster && <button onClick={() => handleDeleteModule(module.id)} className="text-xs text-red-300 hover:text-red-500 ml-2"><Icon name="fa-trash"/></button>}
+                          </h2>
+                          <p className="text-sm text-slate-500">{module.description}</p>
+                      </div>
+                      {isMaster && (
+                          <button onClick={() => setIsAddingVideo({modId: module.id})} className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold hover:bg-blue-200">
+                              + Video
+                          </button>
+                      )}
+                  </div>
+
+                  {/* Horizontal Scroll Container */}
+                  <div className="flex overflow-x-auto gap-6 pb-6 px-2 scrollbar-hide snap-x">
+                      {module.videos.map(video => {
+                          const isWatched = watchedVideos.includes(video.id);
+                          return (
+                              <div key={video.id} className="snap-start shrink-0 w-[300px] md:w-[350px] bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden hover:shadow-xl transition-all relative flex flex-col group/card">
+                                  
+                                  {/* Thumbnail / Video Placeholder */}
+                                  <div className="h-44 bg-slate-900 relative flex items-center justify-center">
+                                      {video.url.includes('youtube') ? (
+                                           <img 
+                                              src={`https://img.youtube.com/vi/${video.url.split('v=')[1]?.split('&')[0]}/hqdefault.jpg`} 
+                                              className="w-full h-full object-cover opacity-80 group-hover/card:opacity-100 transition-opacity"
+                                           />
+                                      ) : (
+                                          <Icon name="fa-chalkboard-teacher" className="text-5xl text-slate-700" />
+                                      )}
+                                      <a href={video.url} target="_blank" className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                          <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-white text-xl shadow-lg scale-90 group-hover/card:scale-100 transition-transform">
+                                              <Icon name="fa-play" className="ml-1" />
+                                          </div>
+                                      </a>
+                                      {/* Duration Badge */}
+                                      <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
+                                          {video.duration}
+                                      </div>
+                                  </div>
+
+                                  {/* Content */}
+                                  <div className="p-4 flex-1 flex flex-col">
+                                      <div className="flex justify-between items-start mb-2">
+                                          <h3 className="font-bold text-slate-800 line-clamp-2 leading-tight h-10">{video.title}</h3>
+                                          {isWatched && <Icon name="fa-check-circle" className="text-green-500 text-lg shrink-0" />}
+                                      </div>
+                                      
+                                      <div className="mt-auto flex gap-2 pt-4 border-t border-slate-100">
+                                          <button 
+                                            onClick={() => handleToggleWatched(video.id)}
+                                            className={`flex-1 text-xs font-bold py-2 rounded transition-colors ${isWatched ? 'bg-slate-100 text-slate-500' : 'bg-SIMPLEDATA-600 text-white hover:bg-SIMPLEDATA-700'}`}
+                                          >
+                                              {isWatched ? 'Visto' : 'Marcar Visto'}
+                                          </button>
+                                          {video.quizUrl && (
+                                              <a href={video.quizUrl} target="_blank" className="flex-1 text-xs font-bold py-2 rounded bg-purple-50 text-purple-600 hover:bg-purple-100 flex items-center justify-center gap-1">
+                                                  <Icon name="fa-tasks" /> Quiz
+                                              </a>
+                                          )}
+                                      </div>
+                                  </div>
+                              </div>
+                          );
+                      })}
                       
-                      {/* DYNAMIC HELP BOX FOR REDIRECT_URI_MISMATCH */}
-                      <div className="bg-red-50 p-4 rounded-lg border-2 border-red-200 text-xs shadow-sm">
-                          <p className="font-bold text-red-700 text-sm mb-2"><Icon name="fa-exclamation-circle" /> Solución Error 400 (Google)</p>
-                          <p className="text-slate-700 mb-2 leading-relaxed">
-                            Si ves el error <strong>"redirect_uri_mismatch"</strong>, debes agregar la siguiente URL exacta en tu Google Cloud Console (APIs & Services {'>'} Credentials {'>'} Client ID {'>'} Authorized JavaScript origins):
-                          </p>
-                          <div className="flex gap-2">
-                            <code className="bg-white border-2 border-red-100 p-2 rounded flex-1 truncate font-mono text-red-600 font-bold select-all">
-                                {currentOrigin}
-                            </code>
-                            <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(currentOrigin);
-                                  alert("URL copiSIMPLEDATA. Pégala en Google Cloud Console.");
-                                }}
-                                className="bg-red-600 hover:bg-red-700 px-3 py-2 rounded text-white font-bold"
-                                title="Copiar URL"
-                            >
-                                <Icon name="fa-copy" />
-                            </button>
-                          </div>
-                      </div>
-
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Gemini API Key (Google AI)</label>
-                          <input 
-                              type="password" 
-                              className="w-full border p-3 rounded-lg font-mono text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-SIMPLEDATA-500" 
-                              placeholder="AIzb..." 
-                              value={manualKeys.apiKey}
-                              onChange={e => setManualKeys({...manualKeys, apiKey: e.target.value})}
-                          />
-                      </div>
-
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">GitHub Personal Access Token (PAT)</label>
-                          <input 
-                              type="password" 
-                              className="w-full border p-3 rounded-lg font-mono text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-SIMPLEDATA-500" 
-                              placeholder="ghp_..." 
-                              value={manualKeys.githubToken}
-                              onChange={e => setManualKeys({...manualKeys, githubToken: e.target.value})}
-                          />
-                      </div>
-
-                      <div className="border-t pt-4">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-2">
-                           <Icon name="fab fa-google-drive" /> Google OAuth Client ID (Para Drive Uploads)
-                        </label>
-                        <p className="text-[10px] text-slate-400 mb-2">
-                           Requerido para subir archivos directo a Drive. 
-                           <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-SIMPLEDATA-600 underline ml-1 font-bold">
-                               Creado en Google Cloud Console
-                           </a>.
-                        </p>
-                        <input 
-                              type="text" 
-                              className="w-full border p-3 rounded-lg font-mono text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-SIMPLEDATA-500" 
-                              placeholder="xxxxxxxx-xxxxxxxx.apps.googleusercontent.com" 
-                              value={manualKeys.googleClientId}
-                              onChange={e => setManualKeys({...manualKeys, googleClientId: e.target.value})}
-                          />
-                      </div>
+                      {/* Add Video Card Placeholder for Master */}
+                      {isMaster && (
+                           <div onClick={() => setIsAddingVideo({modId: module.id})} className="snap-start shrink-0 w-[100px] flex items-center justify-center bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-200 hover:border-slate-400 transition-colors">
+                               <div className="text-center text-slate-400">
+                                   <Icon name="fa-plus" className="text-2xl block mb-1" />
+                                   <span className="text-xs font-bold">Agregar</span>
+                               </div>
+                           </div>
+                      )}
                   </div>
-                  <div className="p-4 border-t shrink-0 bg-slate-50 flex justify-end gap-2">
-                      <button onClick={() => setShowConfig(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                      <button onClick={handleSaveKeys} className="px-6 py-2 bg-SIMPLEDATA-600 text-white font-bold rounded-lg hover:bg-SIMPLEDATA-700 shadow-lg">Guardar y Recargar</button>
-                  </div>
+              </div>
+          ))}
+      </div>
+
+      {/* MODALS */}
+      
+      {/* Add Video Modal */}
+      {isAddingVideo && (
+          <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4">
+              <div className="bg-white p-6 rounded-xl w-full max-w-md">
+                  <h3 className="font-bold text-lg mb-4">Agregar Video a Módulo</h3>
+                  <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const t = e.target as any;
+                      handleSaveVideo(isAddingVideo.modId, t.title.value, t.url.value, 'video');
+                  }}>
+                      <input name="title" className="w-full border p-2 rounded mb-2" placeholder="Título de la clase" required />
+                      <input name="url" className="w-full border p-2 rounded mb-4" placeholder="URL (YouTube / Meet)" required />
+                      <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => setIsAddingVideo(null)} className="px-3 py-1 text-slate-500">Cancelar</button>
+                          <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded font-bold">Guardar</button>
+                      </div>
+                  </form>
               </div>
           </div>
       )}
+
+      {/* Study Guide Modal */}
+      {showStudyGuide && <StudyGuideModal modules={modules} onClose={() => setShowStudyGuide(false)} />}
     </div>
   );
 };

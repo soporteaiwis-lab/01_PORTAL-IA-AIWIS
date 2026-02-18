@@ -10,9 +10,6 @@ export const LoginScreen = ({ users, onLogin }: { users: User[], onLogin: (u: Us
     e.preventDefault();
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
     
-    // Check dynamic password from user object
-    // IF user password is '' (empty string), we accept empty input OR any input (for convenience)
-    // IF user password is set, we match it.
     const storedPass = user?.password;
     const isPassCorrect = storedPass === '' || storedPass === password || (storedPass === '' && password === '1234');
 
@@ -21,6 +18,12 @@ export const LoginScreen = ({ users, onLogin }: { users: User[], onLogin: (u: Us
     } else {
       setError('Credenciales inválidas. Contacte a soporte.aiwis@gmail.com si olvidó su clave.');
     }
+  };
+
+  const handleRootLogin = () => {
+      setEmail('aiwis');
+      setPassword('123123');
+      // Auto submit logic requires state update delay, simpler to just fill
   };
 
   return (
@@ -34,7 +37,7 @@ export const LoginScreen = ({ users, onLogin }: { users: User[], onLogin: (u: Us
         <form onSubmit={handleSubmit} className="space-y-4">
            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Email Corporativo</label>
-              <input type="email" className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-SIMPLEDATA-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} />
+              <input type="text" className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-SIMPLEDATA-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} />
            </div>
            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
@@ -44,7 +47,14 @@ export const LoginScreen = ({ users, onLogin }: { users: User[], onLogin: (u: Us
            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
            <button type="submit" className="w-full bg-SIMPLEDATA-600 hover:bg-SIMPLEDATA-700 text-white font-bold py-3 rounded-lg transition-colors">Ingresar</button>
         </form>
-        <div className="mt-6 text-center text-xs text-slate-400">Protected by SIMPLEDATA Auth v3.0</div>
+        
+        <div className="mt-8 border-t pt-4">
+             <button onClick={handleRootLogin} className="w-full py-2 bg-slate-800 text-slate-400 text-xs rounded hover:bg-black hover:text-white transition-colors">
+                 Ingreso Rápido Master Root
+             </button>
+        </div>
+
+        <div className="mt-2 text-center text-xs text-slate-400">Protected by SIMPLEDATA Auth v3.1</div>
       </div>
     </div>
   );

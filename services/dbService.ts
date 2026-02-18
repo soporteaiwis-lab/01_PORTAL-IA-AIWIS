@@ -1,5 +1,5 @@
-import { User, Project, Gem, ProjectLog, Tool, Repository, UsedID } from '../types';
-import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_GEMS, INITIAL_TOOLS } from '../constants';
+import { User, Project, Gem, ProjectLog, Tool, Repository, UsedID, TrainingModule, CompanyConfig } from '../types';
+import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_GEMS, INITIAL_TOOLS, INITIAL_MODULES } from '../constants';
 
 // Local Storage Keys
 const USERS_KEY = 'SIMPLEDATA_users_v1'; 
@@ -8,6 +8,8 @@ const GEMS_KEY = 'SIMPLEDATA_gems_v1';
 const TOOLS_KEY = 'SIMPLEDATA_tools_v1';
 const USED_IDS_KEY = 'SIMPLEDATA_used_ids_v1'; 
 const CLOUD_SQL_CONFIG_KEY = 'SIMPLEDATA_cloud_sql_config_v1'; 
+const MODULES_KEY = 'SIMPLEDATA_modules_v1'; // New Key
+const COMPANY_CONFIG_KEY = 'SIMPLEDATA_company_config_v1'; // New Key
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -17,7 +19,7 @@ export interface CloudSQLConfig {
     dbUser: string;
     proxyUrl: string; 
     provider: 'postgres' | 'mysql';
-    isActive: boolean; // New flag to toggle mode
+    isActive: boolean; 
 }
 
 export class DBService {
@@ -26,6 +28,8 @@ export class DBService {
   private gems: Gem[] = [];
   private tools: Tool[] = [];
   private usedIds: UsedID[] = [];
+  private modules: TrainingModule[] = [];
+  private companyConfig: CompanyConfig = { title: 'PORTAL CORPORATIVO', subtitle: 'Centro de Capacitación' };
   
   private cloudSqlConfig: CloudSQLConfig = { 
       connectionName: '', 
@@ -46,18 +50,21 @@ export class DBService {
         this.cloudSqlConfig = JSON.parse(savedSql);
     }
 
-    // Always load local data first as cache/fallback
     const savedUsers = localStorage.getItem(USERS_KEY);
     const savedProjects = localStorage.getItem(PROJECTS_KEY);
     const savedGems = localStorage.getItem(GEMS_KEY);
     const savedTools = localStorage.getItem(TOOLS_KEY);
     const savedIds = localStorage.getItem(USED_IDS_KEY);
+    const savedModules = localStorage.getItem(MODULES_KEY);
+    const savedConfig = localStorage.getItem(COMPANY_CONFIG_KEY);
 
     this.users = savedUsers ? JSON.parse(savedUsers) : [...INITIAL_USERS];
     this.projects = savedProjects ? JSON.parse(savedProjects) : [...INITIAL_PROJECTS];
     this.gems = savedGems ? JSON.parse(savedGems) : [...INITIAL_GEMS];
     this.tools = savedTools ? JSON.parse(savedTools) : [...INITIAL_TOOLS];
     this.usedIds = savedIds ? JSON.parse(savedIds) : [];
+    this.modules = savedModules ? JSON.parse(savedModules) : [...INITIAL_MODULES];
+    if (savedConfig) this.companyConfig = JSON.parse(savedConfig);
   }
 
   private saveLocal() {
@@ -66,6 +73,8 @@ export class DBService {
     localStorage.setItem(GEMS_KEY, JSON.stringify(this.gems));
     localStorage.setItem(TOOLS_KEY, JSON.stringify(this.tools));
     localStorage.setItem(USED_IDS_KEY, JSON.stringify(this.usedIds));
+    localStorage.setItem(MODULES_KEY, JSON.stringify(this.modules));
+    localStorage.setItem(COMPANY_CONFIG_KEY, JSON.stringify(this.companyConfig));
     localStorage.setItem(CLOUD_SQL_CONFIG_KEY, JSON.stringify(this.cloudSqlConfig));
   }
 
@@ -78,9 +87,6 @@ export class DBService {
       this.saveLocal(); 
   }
 
-  /**
-   * Executes a query via the Cloud Function Middleware
-   */
   async executeSql(text: string, params: any[] = []): Promise<any> {
       if (!this.cloudSqlConfig.proxyUrl) throw new Error("No Proxy URL configured");
       
@@ -100,13 +106,9 @@ export class DBService {
       }
       
       const json = await response.json();
-      return json.data; // Assumes middleware returns { data: rows[] }
+      return json.data; 
   }
 
-  /**
-   * Creates the necessary tables in Cloud SQL using JSONB for flexibility.
-   * This bridges the gap between NoSQL (React State) and SQL (Postgres).
-   */
   async initializeCloudSchema() {
       if (!this.cloudSqlConfig.isActive) return;
       
@@ -118,7 +120,9 @@ export class DBService {
           `CREATE TABLE IF NOT EXISTS app_projects (id ${idType}, content ${type});`,
           `CREATE TABLE IF NOT EXISTS app_gems (id ${idType}, content ${type});`,
           `CREATE TABLE IF NOT EXISTS app_tools (id ${idType}, content ${type});`,
-          `CREATE TABLE IF NOT EXISTS app_used_ids (id ${idType}, content ${type});`
+          `CREATE TABLE IF NOT EXISTS app_used_ids (id ${idType}, content ${type});`,
+          `CREATE TABLE IF NOT EXISTS app_training_modules (id ${idType}, content ${type});`, // New
+          `CREATE TABLE IF NOT EXISTS app_config (id ${idType}, content ${type});` // New
       ];
 
       for (const query of tables) {
@@ -126,16 +130,11 @@ export class DBService {
       }
   }
 
-  /**
-   * Pushes all local data to Cloud SQL
-   */
   async migrateLocalToCloud() {
       if (!this.cloudSqlConfig.isActive) throw new Error("Cloud connection not active");
       
-      // Helper to bulk upsert
       const upsert = async (table: string, items: any[]) => {
           for (const item of items) {
-              // UPSERT for Postgres
               const query = `
                   INSERT INTO ${table} (id, content) VALUES ($1, $2)
                   ON CONFLICT (id) DO UPDATE SET content = $2;
@@ -149,16 +148,14 @@ export class DBService {
       await upsert('app_gems', this.gems);
       await upsert('app_tools', this.tools);
       await upsert('app_used_ids', this.usedIds);
+      await upsert('app_training_modules', this.modules);
+      await upsert('app_config', [{id: 'global_config', ...this.companyConfig}]);
   }
 
-  /**
-   * Generic CRUD helper that decides between Cloud or Local
-   */
   private async genericGet<T>(localData: T[], tableName: string): Promise<T[]> {
       if (this.cloudSqlConfig.isActive && this.cloudSqlConfig.proxyUrl) {
           try {
               const rows = await this.executeSql(`SELECT content FROM ${tableName}`);
-              // Map { content: {...} } back to raw objects
               return rows.map((r: any) => r.content || JSON.parse(r.content));
           } catch (e) {
               console.warn(`Cloud Fetch Failed for ${tableName}, falling back to local.`, e);
@@ -169,7 +166,6 @@ export class DBService {
   }
 
   private async genericSave<T extends { id: string }>(item: T, tableName: string, localList: T[], action: 'ADD' | 'UPDATE' | 'DELETE') {
-      // 1. Update Local State (Optimistic UI)
       let newList = [...localList];
       if (action === 'DELETE') {
           newList = newList.filter(i => i.id !== item.id);
@@ -180,21 +176,19 @@ export class DBService {
           newList.push(item);
       }
       
-      // Update the internal reference
       if (tableName === 'app_users') this.users = newList as any;
       if (tableName === 'app_projects') this.projects = newList as any;
       if (tableName === 'app_gems') this.gems = newList as any;
       if (tableName === 'app_tools') this.tools = newList as any;
+      if (tableName === 'app_training_modules') this.modules = newList as any;
       
       this.saveLocal();
 
-      // 2. Sync to Cloud
       if (this.cloudSqlConfig.isActive && this.cloudSqlConfig.proxyUrl) {
           try {
               if (action === 'DELETE') {
                   await this.executeSql(`DELETE FROM ${tableName} WHERE id = $1`, [item.id]);
               } else {
-                  // UPSERT
                   await this.executeSql(`
                       INSERT INTO ${tableName} (id, content) VALUES ($1, $2)
                       ON CONFLICT (id) DO UPDATE SET content = $2
@@ -202,23 +196,19 @@ export class DBService {
               }
           } catch (e) {
               console.error(`Cloud Sync Failed for ${tableName}`, e);
-              // In a real app, we'd add to a sync queue here
           }
       }
   }
 
-  // --- CRUD OPERATIONS (Updated for Hybrid Mode) ---
+  // --- CRUD OPERATIONS ---
 
   async resetToDefaults(): Promise<void> {
       this.users = [...INITIAL_USERS];
       this.projects = [...INITIAL_PROJECTS];
       this.gems = [...INITIAL_GEMS];
       this.tools = [...INITIAL_TOOLS];
+      this.modules = [...INITIAL_MODULES];
       this.saveLocal();
-      if(this.cloudSqlConfig.isActive) {
-          // Warning: Resetting cloud DB is dangerous, maybe just leave local reset
-          console.warn("Local data reset. Run Migration to overwrite Cloud Data.");
-      }
   }
 
   // USERS
@@ -248,15 +238,32 @@ export class DBService {
   // USED IDS
   async getUsedIds() { return this.genericGet(this.usedIds, 'app_used_ids'); }
   async registerUsedId(record: UsedID) { 
-       // Only save if not exists
        if (!this.usedIds.some(u => u.id === record.id)) {
            await this.genericSave(record, 'app_used_ids', this.usedIds, 'ADD');
        }
   }
 
+  // TRAINING MODULES
+  async getModules() { return this.genericGet(this.modules, 'app_training_modules'); }
+  async addModule(m: TrainingModule) { await this.genericSave(m, 'app_training_modules', this.modules, 'ADD'); }
+  async updateModule(m: TrainingModule) { await this.genericSave(m, 'app_training_modules', this.modules, 'UPDATE'); }
+  async deleteModule(id: string) { await this.genericSave({ id } as TrainingModule, 'app_training_modules', this.modules, 'DELETE'); }
+
+  // COMPANY CONFIG
+  getCompanyConfig() { return this.companyConfig; }
+  async saveCompanyConfig(c: CompanyConfig) {
+      this.companyConfig = c;
+      this.saveLocal();
+      if(this.cloudSqlConfig.isActive) {
+           await this.executeSql(`
+              INSERT INTO app_config (id, content) VALUES ($1, $2)
+              ON CONFLICT (id) DO UPDATE SET content = $2
+          `, ['global_config', JSON.stringify({id: 'global_config', ...c})]);
+      }
+  }
+
   // --- RAW TABLE ACCESS FOR DB VIEW ---
   getTableData(tableName: string): any[] {
-      // Return local cache for instant viewing, async fetch happens in background
       switch(tableName) {
           case 'USERS': return this.users;
           case 'PROJECTS': return this.projects;
@@ -267,8 +274,6 @@ export class DBService {
   }
 
   async alterTable(tableName: string, action: 'ADD_COLUMN' | 'DROP_COLUMN', fieldName: string) {
-      // With JSONB, "altering" is just updating the JSON structure in the objects.
-      // We simulate this by updating all local objects.
       const data = this.getTableData(tableName);
       const updatedData = data.map(row => {
           if (action === 'ADD_COLUMN') {
@@ -278,28 +283,18 @@ export class DBService {
               return rest;
           }
       });
-      // Bulk update
-      // Determine the internal table name
       const map: any = { 'USERS': 'app_users', 'PROJECTS': 'app_projects', 'GEMS': 'app_gems', 'TOOLS': 'app_tools' };
       const internalName = map[tableName];
       
       if (internalName) {
-          // Update memory
           if (tableName === 'USERS') this.users = updatedData;
           if (tableName === 'PROJECTS') this.projects = updatedData;
-          // ... others
           this.saveLocal();
           
-          // Bulk Push to Cloud if active
           if (this.cloudSqlConfig.isActive) {
-             await this.migrateLocalToCloud(); // Lazy way to sync structure changes
+             await this.migrateLocalToCloud(); 
           }
       }
-  }
-  
-  // Backwards compatibility shim
-  async bulkUpdateTable(tableName: string, newData: any[]) {
-      // ... implemented if needed, but alterTable handles it
   }
 }
 

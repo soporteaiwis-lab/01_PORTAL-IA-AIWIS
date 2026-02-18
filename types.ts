@@ -1,11 +1,13 @@
 
 export enum UserRole {
+  MASTER_ROOT = 'Master Root', // Nuevo Rol Supremo
   ADMIN = 'Super Admin',
   CEO = 'CEO',
   PROJECT_MANAGER = 'Project Manager',
   DEVELOPER = 'Developer',
   DESIGNER = 'Designer',
-  ANALYST = 'Analyst'
+  ANALYST = 'Analyst',
+  STUDENT = 'Estudiante' // Nuevo rol para capacitados
 }
 
 export interface User {
@@ -17,6 +19,7 @@ export interface User {
   avatar: string;
   skills: { name: string; level: number }[];
   projects: string[];
+  completedVideoIds?: string[]; // Para trackear progreso de capacitación
 }
 
 export interface ProjectLog {
@@ -24,18 +27,17 @@ export interface ProjectLog {
   date: string;
   text: string;
   author: string;
-  link?: string; // Added link support for logs
+  link?: string;
 }
 
 export interface Repository {
   id: string;
-  alias: string; // Friendly name (e.g. "Backend Repo", "Carpeta Facturas")
-  url: string; // The exact URL
+  alias: string;
+  url: string;
   type: 'github' | 'drive' | 'other';
 }
 
-// UPDATED STATUSES FOR SDLC
-export type ProjectStatus = 'Planificación' | 'En Desarrollo' | 'En QA' | 'Despliegue' | 'Finalizado' | 'En Curso'; // 'En Curso' kept for legacy data compatibility
+export type ProjectStatus = 'Planificación' | 'En Desarrollo' | 'En QA' | 'Despliegue' | 'Finalizado' | 'En Curso';
 
 export interface Project {
   id: string;
@@ -54,14 +56,13 @@ export interface Project {
   technologies: string[];
   year: number;
   logs: ProjectLog[];
-  repositories: Repository[]; // NEW: Flexible repo management
+  repositories: Repository[];
 }
 
-// NEW: Interface for tracking used correlatives forever
 export interface UsedID {
-  id: string; // e.g. "PROYECTO_005"
-  name: string; // Project Name associated
-  dateUsed: string; // When it was created
+  id: string;
+  name: string;
+  dateUsed: string;
   createdBy: string;
 }
 
@@ -89,13 +90,37 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+// --- TRAINING PORTAL TYPES ---
+export interface TrainingVideo {
+  id: string;
+  title: string;
+  url: string; // YouTube or Meet Link
+  duration: string; // e.g. "15 min"
+  type: 'video' | 'meet';
+  transcriptionUrl?: string; // Drive Link
+  quizUrl?: string; // Form Link
+}
+
+export interface TrainingModule {
+  id: string;
+  title: string;
+  description: string;
+  videos: TrainingVideo[];
+  order: number;
+}
+
+export interface CompanyConfig {
+    title: string;
+    subtitle: string;
+}
+
 export enum AppRoute {
-  DASHBOARD = 'dashboard',
+  DASHBOARD = 'dashboard', // Ahora es el Portal de Capacitación
   PROJECTS = 'projects',
   GEMS = 'gems',
   TEAM = 'team',
   REPORTS = 'reports',
   TOOLS = 'tools',
   ADMIN = 'admin_panel',
-  DATABASE = 'database_manager' // NEW ROUTE
+  DATABASE = 'database_manager'
 }
