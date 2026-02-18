@@ -115,7 +115,8 @@ export interface CompanyConfig {
 }
 
 export enum AppRoute {
-  DASHBOARD = 'dashboard', // Ahora es el Portal de Capacitación
+  DASHBOARD = 'dashboard', // Inicio General
+  CLASSES = 'classes', // Nueva Ruta Exclusiva Clases
   PROJECTS = 'projects',
   GEMS = 'gems',
   TEAM = 'team',

@@ -8,7 +8,6 @@ const Icon = ({ name, className = "" }: { name: string, className?: string }) =>
 export const MobileNav = ({ currentRoute, onNavigate, currentUser }: { currentRoute: AppRoute, onNavigate: (r: AppRoute) => void, currentUser: User | null }) => {
   const isMaster = currentUser?.role === UserRole.MASTER_ROOT;
   const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.CEO || isMaster;
-  const isStudent = !isAdmin;
 
   interface NavItem {
     id: AppRoute;
@@ -18,17 +17,12 @@ export const MobileNav = ({ currentRoute, onNavigate, currentUser }: { currentRo
   }
 
   const items: NavItem[] = [
-    { id: AppRoute.DASHBOARD, icon: isStudent ? 'fa-graduation-cap' : 'fa-chart-line', label: isStudent ? 'Clases' : 'Inicio' },
+    { id: AppRoute.DASHBOARD, icon: 'fa-home', label: 'Inicio' },
+    { id: AppRoute.CLASSES, icon: 'fa-graduation-cap', label: 'Clases' },
+    { id: AppRoute.PROJECTS, icon: 'fa-folder-open', label: 'Proy.' },
+    { id: AppRoute.TOOLS, icon: 'fa-toolbox', label: 'Tools', highlight: true },
+    { id: AppRoute.TEAM, icon: 'fa-users', label: 'Equipo' },
   ];
-
-  if (isAdmin) {
-      items.push({ id: AppRoute.PROJECTS, icon: 'fa-folder-open', label: 'Proy.' });
-      items.push({ id: AppRoute.REPORTS, icon: 'fa-file-contract', label: 'Docs' });
-      items.push({ id: AppRoute.TEAM, icon: 'fa-users', label: 'Equipo' });
-  }
-
-  // Common items
-  items.push({ id: AppRoute.TOOLS, icon: 'fa-toolbox', label: 'Tools', highlight: true });
 
   if (isAdmin) {
       items.push({ id: AppRoute.ADMIN, icon: 'fa-user-shield', label: 'Admin' });

@@ -11,7 +11,7 @@ export const Sidebar = ({
   onNavigate, 
   onLogout,
   onOpenTools,
-  companyName // Recibimos el nombre dinámico
+  companyName 
 }: { 
   currentUser: User, 
   currentRoute: AppRoute, 
@@ -22,25 +22,23 @@ export const Sidebar = ({
 }) => {
   const isMaster = currentUser.role === UserRole.MASTER_ROOT;
   const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CEO || isMaster;
-  const isStudent = !isAdmin;
 
-  // Lógica para el Logo Dinámico (Primera letra del nombre de la empresa)
+  // Lógica para el Logo Dinámico
   const logoLetter = companyName ? companyName.charAt(0).toUpperCase() : 'S';
 
   const menuItems = [
-    { id: AppRoute.DASHBOARD, label: isStudent ? 'Capacitaciones' : 'Portal Clases', icon: 'fa-graduation-cap' },
+    { id: AppRoute.DASHBOARD, label: 'Inicio', icon: 'fa-home' },
+    { id: AppRoute.CLASSES, label: 'Clases', icon: 'fa-graduation-cap' }, // Nueva Sección
+    { id: AppRoute.PROJECTS, label: 'Proyectos', icon: 'fa-folder-open' }, // Visible para todos
+    { id: AppRoute.TEAM, label: 'Equipo', icon: 'fa-users' }, // Visible para todos
+    { id: AppRoute.GEMS, label: 'Mis Gemas', icon: 'fa-gem' }, // Visible para todos
   ];
 
   if (isAdmin) {
       menuItems.push(
-        { id: AppRoute.PROJECTS, label: 'Proyectos', icon: 'fa-folder-open' },
-        { id: AppRoute.TEAM, label: 'Equipo & Alumnos', icon: 'fa-users' }, // Nombre actualizado
         { id: AppRoute.REPORTS, label: 'Informes', icon: 'fa-file-contract' }
       );
   }
-  
-  // Everyone sees Gems
-  menuItems.push({ id: AppRoute.GEMS, label: 'Mis Gemas', icon: 'fa-gem' });
 
   return (
     <div className="w-64 bg-SIMPLEDATA-900 text-slate-300 hidden lg:flex flex-col h-screen fixed left-0 top-0 shadow-xl z-20 print:hidden">
@@ -51,7 +49,7 @@ export const Sidebar = ({
         </div>
         <div className="overflow-hidden">
           <h1 className="text-white font-bold tracking-tight truncate text-sm" title={companyName}>{companyName}</h1>
-          <p className="text-[10px] text-SIMPLEDATA-accent uppercase tracking-wider">LMS Platform</p>
+          <p className="text-[10px] text-SIMPLEDATA-accent uppercase tracking-wider">AIWIS</p>
         </div>
       </div>
 

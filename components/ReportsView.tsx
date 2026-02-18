@@ -92,7 +92,7 @@ export const ReportsView = ({ currentUser, projects, onUpdateProject }: { curren
         <style>body { font-family: sans-serif; padding: 40px; line-height: 1.6; max-width: 800px; margin: 0 auto; }</style>
       </head>
       <body>
-        <h1 style="border-bottom: 2px solid #333; padding-bottom: 10px;">${isGlobalMode ? 'Reporte Global Corporativo' : 'Informe de Actividades'}</h1>
+        <h1 style="border-bottom: 2px solid #333; padding-bottom: 10px;">${isGlobalMode ? 'Reporte Global AIWIS' : 'Informe de Actividades'}</h1>
         <p><strong>Fecha:</strong> ${reportDate} | <strong>Generado por:</strong> ${currentUser.name}</p>
         
         <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -102,6 +102,9 @@ export const ReportsView = ({ currentUser, projects, onUpdateProject }: { curren
 
         <h2>Detalle de Proyectos (${displayProjects.length})</h2>
         ${projectContentHTML || '<p>No hay proyectos en este informe.</p>'}
+        <br/>
+        <hr/>
+        <p style="text-align: center; font-size: 12px; color: #888;">Generado por AIWIS Portal</p>
       </body>
       </html>
     `;
@@ -110,7 +113,7 @@ export const ReportsView = ({ currentUser, projects, onUpdateProject }: { curren
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Informe_${isGlobalMode ? 'GLOBAL' : 'SIMPLEDATA'}_${reportDate}.html`;
+    a.download = `Informe_${isGlobalMode ? 'GLOBAL' : 'AIWIS'}_${reportDate}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -245,7 +248,7 @@ export const ReportsView = ({ currentUser, projects, onUpdateProject }: { curren
       <div className="lg:col-span-2 bg-white rounded-xl shadow-lg border border-slate-200 p-6 md:p-8 min-h-[600px] order-1 lg:order-2">
          <div className="text-center border-b-2 border-slate-800 pb-6 mb-8">
             <h1 className="text-xl md:text-3xl font-bold text-slate-900 uppercase">{isGlobalMode ? 'REPORTE CORPORATIVO GLOBAL' : 'INFORME DE ACTIVIDADES'}</h1>
-            <p className="text-slate-500 mt-2">SIMPLEDATA Ltda - {reportDate}</p>
+            <p className="text-slate-500 mt-2">AIWIS Corp - {reportDate}</p>
             {isGlobalMode && <span className="bg-SIMPLEDATA-900 text-white text-xs px-2 py-1 rounded mt-2 inline-block">VISTA DE GERENCIA</span>}
          </div>
 

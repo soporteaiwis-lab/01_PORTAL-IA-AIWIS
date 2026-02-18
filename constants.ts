@@ -53,37 +53,23 @@ export const INITIAL_USERS: User[] = [
     completedVideoIds: []
   },
   {
-    id: "u_gonzalo",
-    name: "Gonzalo Arias",
-    role: UserRole.CEO,
-    email: "gonzalo.arias@simpledata.cl",
-    password: "1234",
-    avatar: "https://ui-avatars.com/api/?name=Gonzalo+Arias&background=0D8ABC&color=fff",
-    skills: [
-      { name: "Dirección General", level: 100 },
-      { name: "Estrategia de Negocios", level: 98 }
-    ],
-    projects: ["PROYECTO_001", "PROYECTO_002"],
-    completedVideoIds: []
-  },
-  {
     id: "u_soporte",
     name: "Soporte AIWIS",
     role: UserRole.ADMIN,
     email: "soporte.aiwis@gmail.com",
-    password: "",
-    avatar: "https://ui-avatars.com/api/?name=AIWIS+Root&background=000000&color=fff",
-    skills: [{ name: "System Architecture", level: 100 }],
+    password: "123",
+    avatar: "https://ui-avatars.com/api/?name=AIWIS+Soporte&background=000000&color=fff",
+    skills: [{ name: "System Architecture", level: 100 }, { name: "Mentoring", level: 100 }],
     projects: ["PROYECTO_001"],
     completedVideoIds: []
   },
   {
     id: "u_estudiante1",
-    name: "Juan Perez",
+    name: "Estudiante Demo",
     role: UserRole.STUDENT,
-    email: "juan.student@simpledata.cl",
+    email: "alumno@aiwis.cl",
     password: "1234",
-    avatar: "https://ui-avatars.com/api/?name=Juan+Perez&background=random",
+    avatar: "https://ui-avatars.com/api/?name=Estudiante+Demo&background=random",
     skills: [{ name: "Aprendizaje", level: 10 }],
     projects: [],
     completedVideoIds: []
@@ -93,11 +79,11 @@ export const INITIAL_USERS: User[] = [
 export const INITIAL_PROJECTS: Project[] = [
   {
     id: 'PROYECTO_001',
-    name: 'Sistema de Facturación Interna',
-    client: 'Interno SIMPLEDATA',
-    encargadoCliente: 'Gerencia Admin',
-    leadId: 'u_gonzalo', 
-    teamIds: ['u_soporte', 'u_gonzalo'],
+    name: 'Migración Infraestructura Cloud',
+    client: 'Interno AIWIS',
+    encargadoCliente: 'Gerencia AIWIS',
+    leadId: 'u_soporte', 
+    teamIds: ['u_soporte'],
     status: 'En Curso',
     isOngoing: true,
     report: true,
@@ -105,8 +91,8 @@ export const INITIAL_PROJECTS: Project[] = [
     deadline: '2025-06-30',
     progress: 45,
     year: 2025,
-    description: 'Desarrollar un sistema interno para la facturación y cobranza de servicios.',
-    technologies: ['AWS', 'Python'],
+    description: 'Proyecto de modernización de infraestructura y servicios core.',
+    technologies: ['AWS', 'Terraform', 'React'],
     logs: [],
     repositories: []
   }
@@ -126,22 +112,12 @@ export const INITIAL_TOOLS: Tool[] = [
 export const INITIAL_MODULES: TrainingModule[] = [
     {
         id: 'mod_1',
-        title: 'Módulo 1: Inducción Corporativa',
+        title: 'Módulo 1: Inducción AIWIS',
         description: 'Bienvenida a la cultura y herramientas de la empresa.',
         order: 1,
         videos: [
             { id: 'v1', title: 'Visión y Misión', url: 'https://www.youtube.com/watch?v=engvideo1', duration: '10 min', type: 'video' },
             { id: 'v2', title: 'Uso del Portal', url: 'https://meet.google.com/abc-defg-hij', duration: '45 min', type: 'meet' }
-        ]
-    },
-    {
-        id: 'mod_2',
-        title: 'Módulo 2: Seguridad de la Información',
-        description: 'Protocolos de seguridad y manejo de datos sensibles.',
-        order: 2,
-        videos: [
-            { id: 'v3', title: 'Gestión de Contraseñas', url: 'https://www.youtube.com/watch?v=secvideo1', duration: '15 min', type: 'video' },
-            { id: 'v4', title: 'Phishing y Amenazas', url: 'https://www.youtube.com/watch?v=secvideo2', duration: '20 min', type: 'video' }
         ]
     }
 ];

@@ -478,7 +478,7 @@ export const RepositoryManager = ({ project, initialType, onClose, onUpdateProje
                   'Accept': 'application/vnd.github.v3+json'
               },
               body: JSON.stringify({
-                  message: `Upload ${file.name} via SIMPLEDATA Portal (${new Date().toISOString()})`,
+                  message: `Upload ${file.name} via AIWIS Portal (${new Date().toISOString()})`,
                   content: base64Content
               })
           });
@@ -895,7 +895,7 @@ export const RepositoryManager = ({ project, initialType, onClose, onUpdateProje
                                         <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-2xl shrink-0"><Icon name="fa-magic" /></div>
                                         <div>
                                             <h4 className="font-bold text-green-900 text-lg">Generador de Estructura Automática</h4>
-                                            <p className="text-sm text-green-700/80 mt-1">Crea automáticamente las 8 carpetas estándar del proyecto SIMPLEDATA.</p>
+                                            <p className="text-sm text-green-700/80 mt-1">Crea automáticamente las 8 carpetas estándar del proyecto AIWIS.</p>
                                         </div>
                                     </div>
                                     
