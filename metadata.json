@@ -1,0 +1,7 @@
+{
+  "name": "01_PORTAL IA AIWIS",
+  "description": "ECOSISTEMA AIWIS PORTAL IA CORPORATIVO PARA CLIENTES",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
